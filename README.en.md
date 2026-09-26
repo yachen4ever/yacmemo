@@ -84,7 +84,7 @@ Agents on the same machine can also use stdio: `uv run yacmemo-mcp --root /path/
 
 **Using it for the first time?** Read the [user guide](docs/en/00-user-guide.md) first — onboarding, daily usage, and the FAQ are all in there.
 
-## MCP Tools (18)
+## MCP Tools (19)
 
 | Tool | Purpose |
 |---|---|
@@ -99,7 +99,8 @@ Agents on the same machine can also use stdio: `uv run yacmemo-mcp --root /path/
 | `memory_audit_update` | Report execution progress while fixing an audit issue (executing/progress/executed/blocked); identity is recorded into the timeline automatically; re-verification is confirmed by the audit |
 | `memory_list` | Directory tree / recent changes |
 | `memory_context` | **Call first at session start**: returns the integration contract version header + topic registry + each topic card's abstract header (cold-start review) |
-| `topic_list` | List long-term memory topics (grouped into active/archived) |
+| `topic_list` | List long-term memory topics (active/archived, with tags; `tag` param filters by tag) |
+| `topic_tag` | Add/remove tags on a topic (lightweight reversible metadata; the response carries the full tag inventory to guide reuse) |
 | `topic_register` | Register a new topic (**call only when the user explicitly asks**, e.g. "add X to long-term memory"); creates topics/<topic>/abstract.md; on success returns a copyable write template |
 | `topic_unregister` | Unregister a topic (**only on explicit user instruction**; only removes it from the registry, notes untouched, adjudicated as strays afterwards) |
 | `archive_topic` | Archive a topic (**only on explicit user instruction**): the whole topic directory moves into archive/ — still searchable, no longer injected into context |

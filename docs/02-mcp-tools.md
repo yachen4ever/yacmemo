@@ -220,6 +220,7 @@ memory_list(path: str = "", sort: str = "name") -> str
 要梳理一个主题全貌？    → memory_read（看相关笔记链路）
 定期体检？              → memory_audit
 执行审计问题修复？      → memory_audit_update 汇报进度（executing → progress → executed）
+要给主题归类打标？      → topic_tag（优先复用响应里的全库标签清单）
 ```
 
 
@@ -382,5 +383,6 @@ integration_check(onboarded_version="0.1.2")
 要找"某件事记在哪"？  → memory_search（关键词式 query）
 要梳理一个主题全貌？  → memory_read / abstract
 定期体检？            → memory_audit（+ WebUI 审计页）
-不知道有哪些主题？    → topic_list
+不知道有哪些主题？    → topic_list（可按标签过滤）
+用户想按视角归类主题？ → topic_tag（轻量可逆；用户没让就不主动批量打）
 ```

@@ -83,7 +83,7 @@ codex mcp add yacmemo --url http://debsvc.local:9721/yachen/mcp
 
 **第一次用？**请先读 [用户使用手册](docs/00-user-guide.md)——上手、日常用法、常见问题都在里面。
 
-## MCP 工具（18 个）
+## MCP 工具（19 个）
 
 | 工具 | 用途 |
 |---|---|
@@ -98,7 +98,8 @@ codex mcp add yacmemo --url http://debsvc.local:9721/yachen/mcp
 | `memory_audit_update` | 执行审计问题修复时向 server 汇报进度（executing/progress/executed/blocked），identity 自动入时间线；复审由审计自动确认 |
 | `memory_list` | 目录树 / 最近变更 |
 | `memory_context` | **会话开始先调**：返回接入契约版本头 + 主题注册表 + 各主题卡摘要头（冷启动回顾） |
-| `topic_list` | 列出长期记忆主题（活跃/已归档分组） |
+| `topic_list` | 列出长期记忆主题（活跃/已归档分组，含标签；`tag` 参数按标签过滤） |
+| `topic_tag` | 为主题增删标签（轻量可逆元数据；响应带全库标签清单引导复用，避免同义词蔓延） |
 | `topic_register` | 注册新主题（**仅在用户明确要求时调用**，如"把 X 加入长期记忆"），创建 topics/<主题>/abstract.md；成功返回可复制的写入模板 |
 | `topic_unregister` | 注销主题（**仅用户明示**，仅移出注册表，笔记不动，游离后裁决） |
 | `archive_topic` | 归档主题（**仅用户明示**）：整个主题目录移入 archive/，检索保留、context 退出 |

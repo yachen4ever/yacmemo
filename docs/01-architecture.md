@@ -242,8 +242,9 @@ RRF 只用名次不用分数，避免两路分数量纲对齐问题。`kind` 参
 | `memory_audit` | — | 自愈（外部改动/删除 hash 级重算与清理、缺向量笔记重试 embedding）+ D1/D3/D4/D5 扫描 + collisions 报告 + 守卫统计 + 空白处置行自清 + git 快照状态行 |
 | `memory_list` | `path="", sort="name"\|"mtime"` | 目录树 / 最近变更 |
 | `memory_context` | — | **会话开始先调**：PROFILE 前置 + 注册表 + 活跃主题 abstract 摘要头（冷启动回顾） |
-| `topic_list` | — | 列出活跃/已归档主题（分组） |
+| `topic_list` | `tag` | 列出活跃/已归档主题（分组，含标签；可按标签过滤） |
 | `topic_register` | `title, description, related` | 注册新主题（**仅用户明确要求**），创建 topics/<主题>/abstract.md |
+| `topic_tag` | `title, add, remove` | 主题标签增删（轻量可逆；响应带全库清单引导复用） |
 | `topic_unregister` | `title` | 注销主题（**仅用户明确要求**；仅移出注册表，笔记不动，游离后裁决） |
 | `archive_topic` | `title` | 归档主题（**仅用户明确要求**）：整个主题目录移入 archive/（卡路径同步改写），检索可用、context 不注入 |
 | `get_user_preference` | `section=""` | 读画像/偏好全文或指定小节（PROFILE.md 功能层） |
