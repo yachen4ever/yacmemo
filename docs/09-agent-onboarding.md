@@ -43,6 +43,7 @@ codex mcp add yacmemo --url http://debsvc.local:9721/<用户ID>/mcp
    - 事实行用 observation 语法：`- [配置] 服务端口为 9721`；
    - **执行审计问题要汇报进度**：处理 `memory_audit` 发现的问题、或 WebUI「复制执行指令」派下的问题时，先 `memory_audit_update(issue_id, "executing")` 接手，关键动作 `"progress"` 汇报，完成 `"executed"` 附改动摘要，受阻 `"blocked"` 说明卡点；复审由审计自动确认（下轮不再报告即通过），不要声称"已验证"、不要代替人忽略问题；
    - **已结案提案不再可检索**：curator/ 提案报告的全部条目执行完成或忽略后会被系统打结案标记，`memory_search` 默认不返回——不要去执行已结案提案里的条目；`memory_read` 按路径仍可读（那是明确查阅）；
+   - 归档主题内的单篇笔记用 `archive_note`（取消用 `unarchive_note`）；不要手工 memory_move 到 archive/ 根目录（脱离主题归属、WebUI 主题树不可见）；
    - 注册 / 注销 / 归档主题、删除笔记：**仅在用户明确要求时执行**。
 
 3. **不确定就问**：找不到该写进哪个主题、或对记忆内容有疑问，向用户说明而不是猜测。

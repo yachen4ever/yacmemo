@@ -33,6 +33,7 @@ Selecting an entry shows it on the right; this merges all capabilities of the ol
 - **View**: the body renders as markdown by default; `编辑` (Edit) switches to a source textarea, `预览` (Preview) switches back to the rendered view;
 - **Edit**: `保存` (Save) goes through `store.save` — whole-file overwrite, the title follows the first-line `# 标题` (# Title) heading, and the index is rebuilt in sync (FTS/vectors/collisions recomputed);
 - **Delete**: requires a confirm; deletes the file + cleans all indexes. Still recoverable from git. abstract.md cannot be deleted from the UI;
+- **Single-note archival**: selecting a module note inside an active topic offers "Archive" (moves it into archive/<topic>/, visible under the "archived notes" tree group, still searchable); archived notes can be "Unarchived" back into the topic;
 - **Topic tags**: the tree toolbar filters topics by tag, topic nodes carry tag suffixes (〔work·dev〕 style); the "Tag management" modal supports renaming/deleting tags (batch-rewriting the registry) and per-topic tagging (with autocomplete of existing tags);
 - **No UI entry for creating notes**: creation goes through MCP `memory_write` (stricter guards, prevents duplicate titles), or create by hand in Obsidian and let audit self-healing bring it into the index.
 

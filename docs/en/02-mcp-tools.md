@@ -220,6 +220,9 @@ Find "where was X recorded?" → memory_search (keyword-style query)
 Get the full picture of a topic? → memory_read (follow the related-note links)
 Periodic checkup?            → memory_audit
 Fixing an audit issue?       → memory_audit_update to report progress (executing → progress → executed)
+Archive one note in a topic? → archive_note (the abstract cannot be archived alone)
+Unarchive a single note?     → unarchive_note
+Categorizing a topic?        → topic_tag (prefer reusing tags from the response's inventory)
 ```
 
 
@@ -313,6 +316,21 @@ Archives a topic (lifecycle: register → active → archive → unregister): th
 - Difference from unregistration: **archiving does not lose retrievability** — the topic's notes remain searchable in the index; only memory_context stops injecting the abstract and topic_list groups it under archived; archive/ is a registry-free zone and does not count as strays;
 - Reversibility: git history can be rolled back; manually deleting the registry status line restores active status.
 
+## 14.5 archive_note / unarchive_note
+
+```
+archive_note(path: str, reason: str = "") -> str
+unarchive_note(path: str) -> str
+```
+
+Archive/unarchive **a single note inside a topic** (contract 0.3.9; whole-topic archival uses archive_topic):
+
+- archive_note moves the note into `archive/<topic>/`, optionally writing a status line with `reason` at the top of the note;
+- The abstract (topic card) cannot be archived alone; an existing destination is refused;
+- After archiving the note stays searchable and is visible under the "archived notes" group in the WebUI topic tree;
+- unarchive_note resolves the active topic from the directory name and moves the note back to `topics/<topic>/`; free-form archive directories raise an error;
+- Only on explicit user request; **never hand-move notes into archive/ root with memory_move** (it breaks topic ownership and the topic tree).
+
 ## 15. get_user_preference
 
 ```
@@ -381,5 +399,6 @@ Update an existing fact?               → memory_edit / memory_edit_section
 Find "where was X recorded?"           → memory_search (keyword-style query)
 Get the full picture of a topic?       → memory_read / abstract
 Periodic checkup?                      → memory_audit (+ the WebUI audit page)
-Don't know which topics exist?         → topic_list
+Don't know which topics exist?         → topic_list (filterable by tag)
+User wants topics grouped by perspective? → topic_tag (lightweight reversible; never batch-tag unprompted)
 ```

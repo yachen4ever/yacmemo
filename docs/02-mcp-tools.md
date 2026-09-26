@@ -220,6 +220,8 @@ memory_list(path: str = "", sort: str = "name") -> str
 要梳理一个主题全貌？    → memory_read（看相关笔记链路）
 定期体检？              → memory_audit
 执行审计问题修复？      → memory_audit_update 汇报进度（executing → progress → executed）
+归档主题内单篇笔记？    → archive_note（abstract 不可单独归档）
+取消单篇归档？          → unarchive_note
 要给主题归类打标？      → topic_tag（优先复用响应里的全库标签清单）
 ```
 
@@ -314,6 +316,21 @@ archive_topic(title: str) -> str
 - **调用门槛**：仅在用户明确要求时调用（"X 归档吧"/"这个项目翻篇了"）；
 - 与注销的区别：**归档不丢检索**——主题笔记仍在索引里可搜，仅 memory_context 不再注入 abstract、topic_list 分入已归档组；archive/ 是免注册区，不计游离；
 - 可逆性：git 历史可回退，手工删除注册表状态行即恢复活跃。
+
+## 14.5 archive_note / unarchive_note
+
+```
+archive_note(path: str, reason: str = "") -> str
+unarchive_note(path: str) -> str
+```
+
+归档/取消归档**主题内的一篇笔记**（契约 0.3.9；整主题归档用 archive_topic）：
+
+- archive_note 把笔记移入 `archive/<主题名>/`，可选 `reason` 自动写入笔记头部状态行；
+- abstract（主题卡）不可单独归档；目标已存在拒绝；
+- 归档后检索仍可用，WebUI 主题树「单篇归档」分组可见；
+- unarchive_note 按目录名反查活跃主题移回 `topics/<主题>/`，自由归档目录（非主题形态）报错；
+- 仅在用户明确要求时调用；**不要手工 memory_move 到 archive/ 根目录**（脱离主题归属、主题树不可见）。
 
 ## 15. get_user_preference
 
