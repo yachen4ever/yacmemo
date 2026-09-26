@@ -41,7 +41,8 @@ After configuration, prompt the user to **restart the session or reconnect MCP**
    - Use observation syntax for fact lines: `- [config] the service port is 9721`;
    - **Report progress while executing audit issues**: when handling issues found by `memory_audit` or dispatched via the WebUI's "Copy Execution Instruction", first call `memory_audit_update(issue_id, "executing")` to take over, report key actions with `"progress"`, finish with `"executed"` plus a change summary, and use `"blocked"` to explain blockers; re-verification is the audit's job (not reported again next round = verified) — never claim "already verified" and never dismiss issues on a human's behalf;
    - **Settled proposals are no longer searchable**: once every finding of a curator/ proposal report is executed or dismissed, the system stamps the file as settled and `memory_search` no longer returns it — never execute findings from a settled proposal; `memory_read` by path still works (that is deliberate lookup);
-   - Registering / unregistering / archiving topics, deleting notes: **execute only when the user explicitly asks**.
+   - Topic tags: when the user asks for a tag, or when executing a tag-related curator proposal, use `topic_tag` (lightweight, reversible); **prefer reusing existing tags** (the response carries the full tag inventory); never batch-tag unprompted;
+- Registering / unregistering / archiving topics, deleting notes: **execute only when the user explicitly asks**.
 
 3. **When unsure, ask**: if you can't find which topic something belongs in, or have doubts about memory content, explain to the user instead of guessing.
 4. **WebUI interface language**: the WebUI header switches between Chinese and English (the choice is persisted in the browser's localStorage). Memory content and agent collaboration conventions are unaffected by the interface language; if the user asks in English, feel free to point out this switch.
