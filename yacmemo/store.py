@@ -21,7 +21,7 @@ import posixpath
 import re
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from rapidfuzz import fuzz
@@ -682,6 +682,75 @@ class Store:
                          p.read_text(encoding="utf-8"))
         self.snapshots.commit(f"topic: unregister {title}")
         return {"title": title, "card": removed_card}
+
+    # ---- 单篇笔记归档（archive/<主题名>/<文件>；整主题归档用 archive_topic）----
+
+    @staticmethod
+    def _topic_dir_name(title: str) -> str:
+        """与 topic_register/archive_topic 同款：主题名 → 合法目录名。"""
+        return _ILLEGAL_FILENAME.sub('_', title).strip('. ')
+
+    def _topic_of_path(self, rel: str) -> dict | None:
+        """按目录前缀找活跃注册主题（目录即归属）。"""
+        for t in self.load_topics():
+            if t.get("archived") or not t["card"]:
+                continue
+            d = posixpath.dirname(t["card"])
+            if d and rel.startswith(d + "/"):
+                return t
+        return None
+
+    def note_archive(self, path: str, reason: str = "",
+                     identity: Identity | None = None) -> dict:
+        """归档主题内的一篇笔记（不是整个主题）：移入
+        archive/<主题名>/<文件名>。abstract 是主题卡，不允许单独归档；
+        整主题归档用 archive_topic。可逆：note_unarchive 移回。"""
+        rel = self.resolve(path)
+        if posixpath.basename(rel) == "abstract.md":
+            raise StoreError(
+                "abstract 是主题卡，不能单独归档（整主题归档用 archive_topic）。")
+        t = self._topic_of_path(rel)
+        if t is None:
+            raise StoreError(
+                f"{rel} 不属于任何活跃注册主题目录，无需/无法按主题归档。")
+        dest_dir = f"archive/{self._topic_dir_name(t['title'])}"
+        dest = f"{dest_dir}/{posixpath.basename(rel)}"
+        if (self.root / dest).exists():
+            raise StoreError(f"归档目标已存在: {dest}")
+        if reason.strip():
+            abs_p = self.root / rel
+            lines = abs_p.read_text(encoding="utf-8").splitlines()
+            note = (f"> 状态：已归档（{date.today().isoformat()}）——{reason.strip()}")
+            pos = 1 if (lines and lines[0].lstrip().startswith("#")) else 0
+            lines.insert(pos, "\n" + note)
+            abs_p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self._index_note(rel, self._title_of(rel),
+                             abs_p.read_text(encoding="utf-8"))
+        self.move(rel, dest, identity=identity)
+        return {"archived": rel, "to": dest, "topic": t["title"]}
+
+    def note_unarchive(self, path: str,
+                       identity: Identity | None = None) -> dict:
+        """取消单篇归档：archive/<主题名>/<文件> 移回 topics/<主题名>/。
+        目录名按注册活跃主题反查；对不上（如自由目录 archive/memory-layer-design/）
+        会报错——那些文件本就不是主题笔记。"""
+        rel = self.resolve(path)
+        parts = rel.split("/")
+        if parts[0] != "archive" or len(parts) < 3:
+            raise StoreError(f"{rel} 不是 archive/<主题>/<文件> 形态的归档笔记。")
+        dir_name = parts[1]
+        t = next((x for x in self.load_topics()
+                  if not x.get("archived")
+                  and self._topic_dir_name(x["title"]) == dir_name), None)
+        if t is None:
+            raise StoreError(
+                f"目录 archive/{dir_name}/ 不对应任何活跃主题（可能是自由归档目录"
+                "或主题已注销），无法自动取消归档——请用 memory_move 手动处理。")
+        dest = f"{posixpath.dirname(t['card'])}/{parts[-1]}"
+        if (self.root / dest).exists():
+            raise StoreError(f"目标已存在: {dest}")
+        self.move(rel, dest, identity=identity)
+        return {"unarchived": rel, "to": dest, "topic": t["title"]}
 
     # ---- 主题标签（注册表 `- 标签:` 行；轻量可逆元数据）----
 

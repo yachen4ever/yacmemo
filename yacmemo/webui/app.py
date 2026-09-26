@@ -747,6 +747,33 @@ def create_webui_routes(config: Config, contexts: dict[str, dict]) -> list[Route
             return _err(str(e))
         return _ok(r)
 
+    async def note_archive(request: Request):
+        try:
+            c = _ctx(request.path_params["user"])
+        except KeyError:
+            return _err("未知用户", 404)
+        body = await _body(request)
+        try:
+            r = await run_in_threadpool(c["store"].note_archive,
+                                        body.get("path", ""),
+                                        body.get("reason", ""))
+        except Exception as e:
+            return _err(str(e))
+        return _ok(r)
+
+    async def note_unarchive(request: Request):
+        try:
+            c = _ctx(request.path_params["user"])
+        except KeyError:
+            return _err("未知用户", 404)
+        body = await _body(request)
+        try:
+            r = await run_in_threadpool(c["store"].note_unarchive,
+                                        body.get("path", ""))
+        except Exception as e:
+            return _err(str(e))
+        return _ok(r)
+
     async def topic_archive(request: Request):
         try:
             c = _ctx(request.path_params["user"])
@@ -1142,6 +1169,8 @@ def create_webui_routes(config: Config, contexts: dict[str, dict]) -> list[Route
         Route("/api/{user}/proposals", _wrap(proposals_list), methods=["GET"]),
         Route("/api/{user}/topics", _wrap(topics_list), methods=["GET"]),
         Route("/api/{user}/topics/archive", _wrap(topic_archive), methods=["POST"]),
+        Route("/api/{user}/note/archive", _wrap(note_archive), methods=["POST"]),
+        Route("/api/{user}/note/unarchive", _wrap(note_unarchive), methods=["POST"]),
         Route("/api/{user}/topics/tag", _wrap(topics_tag), methods=["POST"]),
         Route("/api/{user}/topics/tag-rename", _wrap(topic_tag_rename), methods=["POST"]),
         Route("/api/{user}/topics/tag-delete", _wrap(topic_tag_delete), methods=["POST"]),

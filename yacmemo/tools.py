@@ -579,6 +579,51 @@ def register_tools(mcp: FastMCP, store: Store, searcher: Searcher,
                     f"memory_move 归位 archive/，或明确确认后用 memory_delete 删除。")
 
     @mcp.tool()
+    def archive_note(path: str, reason: str = "", ctx: Context = None) -> str:
+        """归档主题内的一篇笔记（不是整个主题）：移入 archive/<主题名>/。
+        仅在用户明确要求时调用；abstract（主题卡）不可单独归档；
+        整主题归档用 archive_topic。可逆：unarchive_note 移回。
+
+        Args:
+            path: 笔记路径（须属于某个活跃注册主题目录）
+            reason: 归档原因（写入笔记头部状态行，可空）
+        """
+        out = {"ok": True, "error": ""}
+        with _logged("archive_note", ctx,
+                     summarize_args("archive_note", locals()), out):
+            ident = _identity_from_ctx(ctx)
+            try:
+                r = store.note_archive(path, reason=reason, identity=ident)
+            except StoreError as e:
+                return f"{e}"
+            except Exception as e:
+                out["ok"], out["error"] = False, str(e)
+                return f"归档失败: {e}"
+        return (f"已归档: {r['archived']} → {r['to']}\n"
+                f"检索仍可用；WebUI 已归档分组可见；取消归档用 unarchive_note。")
+
+    @mcp.tool()
+    def unarchive_note(path: str, ctx: Context = None) -> str:
+        """取消单篇归档：archive/<主题名>/<文件> 移回 topics/<主题名>/。
+        仅在用户明确要求时调用。
+
+        Args:
+            path: 归档笔记路径（archive/<主题>/<文件> 形态）
+        """
+        out = {"ok": True, "error": ""}
+        with _logged("unarchive_note", ctx,
+                     summarize_args("unarchive_note", locals()), out):
+            ident = _identity_from_ctx(ctx)
+            try:
+                r = store.note_unarchive(path, identity=ident)
+            except StoreError as e:
+                return f"{e}"
+            except Exception as e:
+                out["ok"], out["error"] = False, str(e)
+                return f"取消归档失败: {e}"
+        return f"已取消归档: {r['unarchived']} → {r['to']}"
+
+    @mcp.tool()
     def archive_topic(title: str, ctx: Context = None) -> str:
         """归档主题（仅在用户明确要求时调用，如"X 归档吧"）：abstract 移入 archive/，
         注册表标记为已归档——检索仍可用，memory_context 不再注入，不计游离。

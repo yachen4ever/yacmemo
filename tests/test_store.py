@@ -623,3 +623,26 @@ def test_write_echoes_new_collisions(store):
     assert r["new_collisions"], "写响应必须带回新撞车"
     assert any(c["with_path"] == "notes/撞车甲.md" for c in r["new_collisions"])
     assert r["new_collisions"][0]["text"] == "yacmemo 服务端口是 9721"
+
+
+def test_note_archive_and_unarchive_roundtrip(store: Store):
+    """单篇归档：主题内模块笔记 → archive/<主题名>/，摘要行注入；
+    abstract 拒绝；取消归档移回；整主题归档目的地兼容（同目录）。"""
+    store.topic_register("家庭主题", description="x")
+    store.write("topics/家庭主题/外网笔记", "# 外网笔记\n\n- [配置] VPS 2 台\n")
+    rel = "topics/家庭主题/外网笔记.md"
+
+    r = store.note_archive(rel, reason="历史参考")
+    assert r["to"] == "archive/家庭主题/外网笔记.md"
+    assert not (store.root / rel).is_file()
+    body = (store.root / r["to"]).read_text(encoding="utf-8")
+    assert "已归档（" in body and "历史参考" in body
+
+    # abstract 拒绝单独归档
+    with pytest.raises(Exception, match="主题卡"):
+        store.note_archive("topics/家庭主题/abstract.md")
+
+    # 先取消归档再验证往返
+    r2 = store.note_unarchive(r["to"])
+    assert r2["to"] == rel
+    assert (store.root / rel).is_file()

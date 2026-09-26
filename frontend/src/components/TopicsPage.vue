@@ -30,6 +30,10 @@
                 <n-button size="small" @click="toggleEdit">
                   {{ editing ? t('预览') : t('编辑') }}
                 </n-button>
+                <n-button v-if="canArchiveSelected" size="small"
+                  @click="archiveSelected">{{ t('归档') }}</n-button>
+                <n-button v-if="canUnarchiveSelected" size="small"
+                  @click="unarchiveSelected">{{ t('取消归档') }}</n-button>
                 <n-button size="small" type="error" ghost @click="handleDelete"
                   v-if="!isAbstract">{{ t('删除') }}</n-button>
               </n-space>
@@ -216,6 +220,19 @@ const treeData = computed(() => {
       }),
     })
   }
+  // 散归档文件：archive/ 下不属于任何注册归档主题目录的 md
+  //（单篇归档产物；注册归档主题目录内的文件已在上面挂出）
+  const archivedDirs = archived.map(t => dirOf(t.card)).filter(Boolean)
+  const strayArchived = notes.value.filter(n =>
+    n.path.startsWith('archive/') &&
+    !archivedDirs.some(d => n.path.startsWith(d + '/')))
+  if (strayArchived.length) {
+    result.push({
+      key: 'stray-archived',
+      label: `${t('单篇归档')} (${strayArchived.length})`,
+      children: strayArchived.map(noteNode),
+    })
+  }
   // Free zones
   result.push({ key: 'free', label: t('免注册区'), children: [
     { key: 'zone:journal', label: 'journal', children: notes.value
@@ -306,6 +323,58 @@ async function onSelect(keys) {
     editContent.value = data.content
   } catch (e) {
     message.error(t('读取失败') + ': ' + e.message)
+  }
+}
+
+// 单篇归档能力：活跃主题目录内的非 abstract 笔记可归档；
+// archive/<主题>/ 形态的可取消归档（回 topics/<主题>/）
+const canArchiveSelected = computed(() => {
+  if (!selectedNote.value || isAbstract.value) return false
+  const p = selectedNote.value.path
+  if (p.startsWith('archive/')) return false
+  return !!topics.value.find(x => !x.archived && x.card &&
+    p.startsWith(x.card.split('/').slice(0, -1).join('/') + '/'))
+})
+const canUnarchiveSelected = computed(() => {
+  if (!selectedNote.value) return false
+  const seg = selectedNote.value.path.split('/')
+  return seg[0] === 'archive' && seg.length >= 3
+})
+
+async function archiveSelected() {
+  dialog.warning({
+    title: t('归档笔记'),
+    content: t('将 {path} 移入 archive/<主题名>/？检索仍可用，可随时取消归档。',
+      { path: selectedNote.value.path }),
+    positiveText: t('归档'),
+    negativeText: t('取消'),
+    onPositiveClick: async () => {
+      try {
+        const r = await api(`/api/${props.user}/note/archive`, {
+          method: 'POST',
+          body: JSON.stringify({ path: selectedNote.value.path }),
+        })
+        message.success(t('已归档 → {dest}', { dest: r.to }))
+        selectedNote.value = null
+        await loadData()
+      } catch (e) {
+        message.error(e.message)
+      }
+    },
+  })
+}
+
+async function unarchiveSelected() {
+  try {
+    const r = await api(`/api/${props.user}/note/unarchive`, {
+      method: 'POST',
+      body: JSON.stringify({ path: selectedNote.value.path }),
+    })
+    message.success(t('已取消归档 → {dest}', { dest: r.to }))
+    selectedNote.value = null
+    await loadData()
+  } catch (e) {
+    message.error(e.message)
   }
 }
 

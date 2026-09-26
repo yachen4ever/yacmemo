@@ -144,6 +144,8 @@ def summarize_args(tool: str, kwargs: dict) -> str:
         return f"path={kwargs.get('path', '')}"
     if tool == "memory_audit_update":
         return f"{kwargs.get('issue_id', '')} → {kwargs.get('event', '')}"
+    if tool in ("archive_note", "unarchive_note"):
+        return f"{kwargs.get('path', '')}"
     if tool == "topic_tag":
         return (f"{kwargs.get('title', '')} "
                 f"+[{kwargs.get('add', '')}] -[{kwargs.get('remove', '')}]")

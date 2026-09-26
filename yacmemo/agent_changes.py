@@ -12,10 +12,18 @@ integration_check(onboarded_version=...) 获取增量变更与最新写入约定
 
 from __future__ import annotations
 
-AGENT_CONTRACT_VERSION = "0.3.8"
+AGENT_CONTRACT_VERSION = "0.3.9"
 
 # 版本 -> 该版本里 agent 需要知道的变化（措辞可直接执行）
 AGENT_CHANGELOG: dict[str, str] = {
+    "0.3.9": (
+        "- 新增 archive_note(path, reason) / unarchive_note(path)：归档/取消"
+        "归档主题内的单篇笔记（移入/移出 archive/<主题名>/）。abstract 不可"
+        "单独归档（整主题用 archive_topic）。仅在用户明确要求时调用；\n"
+        "- 归档笔记检索仍可用，WebUI 已归档分组可见；不要再手工 memory_move"
+        " 到 archive/ 根目录（那会脱离主题归属、WebUI 主题树不可见）；\n"
+        "- 工具语义无其他变化。"
+    ),
     "0.3.8": (
         "- 新增 topic_tag(title, add, remove) 工具：为主题增删标签（0-多个，"
         "轻量可逆元数据）；响应自带全库标签清单——打标签优先复用已有标签，"
