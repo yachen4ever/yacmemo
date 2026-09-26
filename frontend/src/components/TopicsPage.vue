@@ -3,6 +3,11 @@
     <n-split direction="horizontal" :max="0.8" :min="0.15" :default-size="0.25">
       <template #1>
         <div class="topic-tree">
+          <div class="topic-toolbar">
+            <n-select v-model:value="tagFilter" multiple clearable size="small"
+              :options="tagOptions" :placeholder="t('按标签过滤')" :max-tag-count="2" />
+            <n-button size="small" @click="tagModal = true">{{ t('标签管理') }}</n-button>
+          </div>
           <n-spin v-if="loading" size="small" />
           <n-tree
             v-else
@@ -41,12 +46,70 @@
         </div>
       </template>
     </n-split>
+
+    <!-- 标签管理：标签清单（重命名/删除）+ 按主题打标签 -->
+    <n-modal v-model:show="tagModal" preset="card" :title="t('标签管理')" style="width: 580px">
+      <n-space vertical size="large">
+        <div>
+          <n-text strong>{{ t('标签清单') }}</n-text>
+          <n-empty v-if="!Object.keys(tagCounts).length" :description="t('暂无标签')"
+            size="small" style="margin-top: 6px" />
+          <n-list v-else style="margin-top: 6px">
+            <n-list-item v-for="(cnt, tag) in tagCounts" :key="tag">
+              <template v-if="renaming === tag">
+                <n-space :size="4" :wrap="false">
+                  <n-input v-model:value="renameInput" size="small" style="width: 140px" />
+                  <n-button size="tiny" type="primary" @click="doRename(tag)">{{ t('保存') }}</n-button>
+                  <n-button size="tiny" @click="renaming = ''">{{ t('取消') }}</n-button>
+                </n-space>
+              </template>
+              <n-space v-else justify="space-between" align="center">
+                <n-space align="center" :size="6">
+                  <n-tag size="small">{{ tag }}</n-tag>
+                  <n-text depth="3" style="font-size: 12px">{{ cnt }} {{ t('个主题') }}</n-text>
+                </n-space>
+                <n-space :size="4">
+                  <n-button size="tiny" @click="startRename(tag)">{{ t('重命名') }}</n-button>
+                  <n-popconfirm @positive-click="doDeleteTag(tag)">
+                    <template #trigger>
+                      <n-button size="tiny" type="error" ghost>{{ t('删除') }}</n-button>
+                    </template>
+                    {{ t('从所有主题移除该标签？主题本身不受影响。') }}
+                  </n-popconfirm>
+                </n-space>
+              </n-space>
+            </n-list-item>
+          </n-list>
+        </div>
+        <n-divider style="margin: 0" />
+        <div>
+          <n-text strong>{{ t('按主题打标签') }}</n-text>
+          <n-space vertical size="small" style="margin-top: 6px">
+            <n-select v-model:value="tagTopic" filterable
+              :options="topicOptions" :placeholder="t('选择主题')" />
+            <template v-if="tagTopic">
+              <n-space align="center" :size="4">
+                <n-tag v-for="tg in tagsOf(tagTopic)" :key="tg" size="small" closable
+                  @close="removeTag(tagTopic, tg)">{{ tg }}</n-tag>
+                <n-text v-if="!tagsOf(tagTopic).length" depth="3" style="font-size: 12px">
+                  {{ t('暂无标签') }}
+                </n-text>
+              </n-space>
+              <n-select v-model:value="newTag" filterable tag clearable
+                :options="tagOptions" :placeholder="t('添加标签（可选已有或输入新标签）')"
+                @update:value="addTag" />
+            </template>
+          </n-space>
+        </div>
+      </n-space>
+    </n-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import { NSplit, NSpin, NTree, NEmpty, NText, NSpace, NButton, NInput, useMessage, useDialog } from 'naive-ui'
+import { NSplit, NSpin, NTree, NEmpty, NText, NSpace, NButton, NInput, NSelect,
+         NModal, NList, NListItem, NTag, NDivider, NPopconfirm, useMessage, useDialog } from 'naive-ui'
 import { marked } from 'marked'
 import { api, params } from '../composables/api.js'
 import { t } from '../composables/i18n.js'
@@ -65,6 +128,31 @@ const editContent = ref('')
 const isAbstract = ref(false)
 
 const expandedKeys = ref([])
+const tagFilter = ref([])
+const tagModal = ref(false)
+const renaming = ref('')
+const renameInput = ref('')
+const tagTopic = ref('')
+const newTag = ref(null)
+
+const tagsOfTitle = (title) => {
+  const t = topics.value.find(x => x.title === title)
+  return t?.tags || []
+}
+const tagsOf = tagsOfTitle
+
+const tagOptions = computed(() =>
+  Object.keys(tagCounts.value).map(x => ({ label: x, value: x })))
+
+const tagCounts = computed(() => {
+  const c = {}
+  for (const t of topics.value)
+    for (const x of t.tags || []) c[x] = (c[x] || 0) + 1
+  return c
+})
+
+const topicOptions = computed(() =>
+  topics.value.map(x => ({ label: x.title + (x.archived ? `（${t('已归档')}）` : ''), value: x.title })))
 
 const treeData = computed(() => {
   const result = []
@@ -87,35 +175,39 @@ const treeData = computed(() => {
   }
   const isCovered = path => coveredFiles.has(path) ||
     [...coveredDirs].some(d => path.startsWith(d + '/'))
+  const tagSel = tagFilter.value || []
+  const tagMatch = t => !tagSel.length || (t.tags || []).some(x => tagSel.includes(x))
+  const topicLabel = t => t.title +
+    ((t.tags || []).length ? ` 〔${t.tags.join('·')}〕` : '')
   // Active topics：每主题一目录，目录即归属（按卡所在目录取模块笔记）
   const activeChildren = []
-  for (const t of topics.value.filter(t => !t.archived)) {
+  for (const t of topics.value.filter(t => !t.archived && tagMatch(t))) {
     const dir = dirOf(t.card)
     const topicNotes = notes.value.filter(n =>
       dir && n.path.startsWith(dir + '/') && n.path !== t.card)
     activeChildren.push({
       key: `topic:${t.title}`,
-      label: t.title,
+      label: topicLabel(t),
       children: [
         { key: `note:${t.card}`, label: 'abstract', isLeaf: true },
         ...topicNotes.map(noteNode),
       ],
     })
   }
-  result.push({ key: 'active', label: `${t("活跃主题")} (${activeChildren.length})`, children: activeChildren })
+  result.push({ key: 'active', label: `${t('活跃主题')} (${activeChildren.length})`, children: activeChildren })
   // Archived topics：卡已被后端改写到 archive/<主题>/，同样展开目录下全部文件
-  const archived = topics.value.filter(t => t.archived)
+  const archived = topics.value.filter(t => t.archived && tagMatch(t))
   if (archived.length) {
     result.push({
       key: 'archived',
-      label: `${t("已归档")} (${archived.length})`,
+      label: `${t('已归档')} (${archived.length})`,
       children: archived.map(t => {
         const dir = dirOf(t.card)
         const files = notes.value.filter(n =>
           dir && n.path.startsWith(dir + '/') && n.path !== t.card)
         return {
           key: `topic:${t.title}`,
-          label: t.title,
+          label: topicLabel(t),
           children: [
             { key: `note:${t.card}`, label: 'abstract', isLeaf: true },
             ...files.map(noteNode),
@@ -125,7 +217,7 @@ const treeData = computed(() => {
     })
   }
   // Free zones
-  result.push({ key: 'free', label: t("免注册区"), children: [
+  result.push({ key: 'free', label: t('免注册区'), children: [
     { key: 'zone:journal', label: 'journal', children: notes.value
       .filter(n => n.path.startsWith('journal/'))
       .map(noteNode) },
@@ -140,7 +232,7 @@ const treeData = computed(() => {
     const byAgent = {}
     for (const n of agentNotes) {
       const seg = n.path.split('/')
-      const agent = seg[1] || t("（未分组）")
+      const agent = seg[1] || t('（未分组）')
       const g = (byAgent[agent] = byAgent[agent] || { shared: [], devices: {} })
       if (seg[2] === 'shared') g.shared.push(n)
       else if (seg.length >= 4) {
@@ -149,7 +241,7 @@ const treeData = computed(() => {
     }
     result.push({
       key: 'agents',
-      label: `${t("专属记忆")} (${agentNotes.length})`,
+      label: `${t('专属记忆')} (${agentNotes.length})`,
       children: Object.entries(byAgent).map(([agent, g]) => ({
         key: `agent:${agent}`,
         label: agent,
@@ -170,11 +262,11 @@ const treeData = computed(() => {
     !n.path.startsWith('curator/') && !n.path.startsWith('agents/') &&
     n.path !== 'TOPICS.md' && n.path !== 'PROFILE.md' &&
     !isCovered(n.path))
-  result.push({ key: 'stray', label: `${t("游离文件")} (${strays.length})`,
+  result.push({ key: 'stray', label: `${t('游离文件')} (${strays.length})`,
     children: strays.map(noteNode) })
   const system = notes.value.filter(n => n.path === 'TOPICS.md' || n.path === 'PROFILE.md')
   if (system.length) {
-    result.push({ key: 'system', label: t("系统文件"), children: system.map(noteNode) })
+    result.push({ key: 'system', label: t('系统文件'), children: system.map(noteNode) })
   }
   return result
 })
@@ -259,6 +351,59 @@ function handleDelete() {
   })
 }
 
+// ---- 标签管理 ----
+async function tagApi(payload) {
+  const data = await api(`/api/${props.user}/topics/tag`, {
+    method: 'POST', body: JSON.stringify(payload),
+  })
+  await loadData()
+  return data
+}
+
+function addTag(val) {
+  if (!tagTopic.value || !val) return
+  tagApi({ title: tagTopic.value, add: val }).then(() => { newTag.value = null })
+}
+
+function removeTag(title, tag) {
+  tagApi({ title, remove: tag })
+}
+
+function startRename(tag) {
+  renaming.value = tag
+  renameInput.value = tag
+}
+
+async function doRename(old) {
+  if (!renameInput.value.trim() || renameInput.value === old) {
+    renaming.value = ''
+    return
+  }
+  try {
+    await api(`/api/${props.user}/topics/tag-rename`, {
+      method: 'POST',
+      body: JSON.stringify({ old, new: renameInput.value.trim() }),
+    })
+    message.success(t('已保存'))
+    renaming.value = ''
+    await loadData()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+async function doDeleteTag(tag) {
+  try {
+    await api(`/api/${props.user}/topics/tag-delete`, {
+      method: 'POST', body: JSON.stringify({ tag }),
+    })
+    message.success(t('已删除'))
+    await loadData()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
 watch(() => props.user, () => { if (props.user) loadData() })
 onMounted(() => { if (props.user) loadData() })
 </script>
@@ -266,6 +411,11 @@ onMounted(() => { if (props.user) loadData() })
 <style scoped>
 .topics-page { height: 100%; }
 .topic-tree { padding: 8px; height: 100%; overflow-y: auto; }
+.topic-toolbar {
+  display: flex; gap: 6px; margin-bottom: 6px;
+  position: sticky; top: 0; z-index: 1;
+  padding-bottom: 4px;
+}
 .topic-detail { padding: 0 16px; height: 100%; overflow-y: auto; }
 .markdown-body { line-height: 1.7; }
 .markdown-body :deep(h1) { font-size: 1.5em; margin: 0.5em 0; }

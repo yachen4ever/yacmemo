@@ -12,10 +12,20 @@ integration_check(onboarded_version=...) 获取增量变更与最新写入约定
 
 from __future__ import annotations
 
-AGENT_CONTRACT_VERSION = "0.3.7"
+AGENT_CONTRACT_VERSION = "0.3.8"
 
 # 版本 -> 该版本里 agent 需要知道的变化（措辞可直接执行）
 AGENT_CHANGELOG: dict[str, str] = {
+    "0.3.8": (
+        "- 新增 topic_tag(title, add, remove) 工具：为主题增删标签（0-多个，"
+        "轻量可逆元数据）；响应自带全库标签清单——打标签优先复用已有标签，"
+        "避免同义词蔓延；用户没让就不主动批量打标；\n"
+        "- topic_list 新增 tag 过滤参数，输出含每主题的标签；\n"
+        "- topic_register 新增可选 tags 参数（注册时即可打标）；\n"
+        "- 标签存储在注册表 `- 标签:` 行；curator 三项标签稽核"
+        "（tag-missing / tag-duplicate / tag-mismatch）已上线，提案会点名；\n"
+        "- 工具语义无其他变化。"
+    ),
     "0.3.7": (
         "- 撤销 0.3.6 的调和收窄：手工打标重新对全部条目生效——确认全部"
         "条目处置完毕后用 memory_edit 在提案文件头部打「> 状态：已结案」，"

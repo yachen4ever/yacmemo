@@ -156,3 +156,41 @@ def test_archive_moves_whole_dir_and_rewrites_card(store: Store):
     assert a["dangling_cards"] == []
     # context 不再注入 abstract 摘要头（注册表条目本身仍全量可见）
     assert "### 归档测试（" not in store.memory_context()
+
+
+def test_topic_tags_roundtrip(store: Store):
+    """标签注册表往返：注册时打标 → topic_tag 增删 → tag_rename/tag_delete
+    全库生效；标签行持久化在 TOPICS.md（markdown 事实源）。"""
+    store.topic_register("甲主题", description="x", tags="工作, 开发")
+    store.topic_register("乙主题", description="y")
+    tags_of = {t["title"]: t.get("tags") or [] for t in store.load_topics()}
+    assert tags_of["甲主题"] == ["工作", "开发"]
+    assert tags_of["乙主题"] == []
+
+    # 增删（幂等：重复 add 不重复出现）
+    r = store.topic_tag("甲主题", add="工作, 生活")
+    assert r["tags"] == ["工作", "开发", "生活"]
+    assert sorted(r["all_tags"]) == ["工作", "开发", "生活"]
+    store.topic_tag("甲主题", remove="开发")
+
+    # 未知主题拒绝
+    with pytest.raises(Exception, match="注册表中没有主题"):
+        store.topic_tag("不存在的主题", add="x")
+
+    # 重命名全库生效 + 重名合并
+    store.topic_tag("乙主题", add="上班")
+    r = store.tag_rename("上班", "工作")
+    assert sorted(r["topics"]) == ["乙主题"]
+    tags_of = {t["title"]: t.get("tags") or [] for t in store.load_topics()}
+    assert tags_of["乙主题"] == ["工作"]
+
+    # 删除标签：只动标签行，主题文件不动
+    r = store.tag_delete("生活")
+    assert r["topics"] == ["甲主题"]
+    assert (store.root / "topics/甲主题/abstract.md").is_file()
+    tags_of = {t["title"]: t.get("tags") or [] for t in store.load_topics()}
+    assert tags_of["甲主题"] == ["工作"]
+
+    # TOPICS.md 事实源：标签行落在注册表文件里
+    raw = (store.root / "TOPICS.md").read_text(encoding="utf-8")
+    assert "- 标签: 工作" in raw

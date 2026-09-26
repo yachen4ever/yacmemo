@@ -56,7 +56,7 @@ PROFILE_FILE = "PROFILE.md"
 # 免注册区：不参与主题注册与游离检测的目录（agents/ 另有 identity 写守卫，
 # 见 _require_agents_write——免注册 ≠ 任意可写）
 FREE_ZONES = ("journal/", "archive/", "curator/", AGENTS_PREFIX)
-_TOPIC_FIELD_RE = re.compile(r"^-\s*(卡|相关|现状|注册|状态):\s*(.*)$")
+_TOPIC_FIELD_RE = re.compile(r"^-\s*(卡|相关|现状|注册|状态|标签):\s*(.*)$")
 
 # memory_read 返回值里的附加信息标记：agent 把它们当文件内容抄进 old_string
 # 时，拒绝消息要能直接点破（2026-09-16 TeleAgent 连续 4 次 edit 失败的根因）
@@ -585,7 +585,8 @@ class Store:
                 if cur:
                     topics.append(cur)
                 cur = {"title": line[3:].strip(), "card": "", "related": [],
-                       "status": "", "archived": False, "registered": ""}
+                       "status": "", "archived": False, "registered": "",
+                       "tags": []}
             elif cur is not None:
                 m = _TOPIC_FIELD_RE.match(line)
                 if m:
@@ -595,6 +596,9 @@ class Store:
                     elif key == "相关":
                         cur["related"] = [x.strip().rstrip("/")
                                           for x in val.split(",") if x.strip()]
+                    elif key == "标签":
+                        cur["tags"] = [x.strip() for x in val.split(",")
+                                       if x.strip()]
                     elif key == "现状":
                         cur["status"] = val
                     elif key == "注册":
@@ -606,7 +610,8 @@ class Store:
         return topics
 
     def topic_register(self, title: str, description: str = "",
-                       related: str = "", card_path: str = "") -> dict:
+                       related: str = "", card_path: str = "",
+                       tags: str = "") -> dict:
         """Register a new topic: append to TOPICS.md and create the topic card.
 
         Called only on explicit user instruction (约定：用户明确要求时才注册).
@@ -633,9 +638,11 @@ class Store:
 
         from .fs_utils import content_hash as _ch  # noqa: F401 (kept for parity)
         now = datetime.now(UTC).isoformat(timespec="seconds")
+        tlist = [x.strip() for x in tags.replace("，", ",").split(",") if x.strip()]
+        tags_line = f"- 标签: {', '.join(tlist)}\n" if tlist else ""
         with open(self.topics_file(), "a", encoding="utf-8") as f:
-            f.write(f"\n## {title}\n- 卡: {card_path}\n- 相关: {related}\n"
-                    f"- 现状: {description}\n- 注册: {now}\n")
+            f.write(f"\n## {title}\n- 卡: {card_path}\n{tags_line}"
+                    f"- 相关: {related}\n- 现状: {description}\n- 注册: {now}\n")
 
         # index the new/updated files so search sees them immediately
         self._index_note(card_path, title,
@@ -675,6 +682,92 @@ class Store:
                          p.read_text(encoding="utf-8"))
         self.snapshots.commit(f"topic: unregister {title}")
         return {"title": title, "card": removed_card}
+
+    # ---- 主题标签（注册表 `- 标签:` 行；轻量可逆元数据）----
+
+    @staticmethod
+    def _parse_tags(raw: str) -> list[str]:
+        return [x.strip() for x in raw.replace("，", ",").split(",") if x.strip()]
+
+    def _set_topic_tags(self, title: str, tags: list[str]) -> None:
+        """改写注册表中该主题块的 `- 标签:` 行（空列表 = 整行移除），
+        重索引注册表并快照。"""
+        p = self.topics_file()
+        lines = p.read_text(encoding="utf-8").splitlines(keepends=True)
+        start = next((i for i, ln in enumerate(lines)
+                      if ln.rstrip("\r\n") == f"## {title}"), None)
+        if start is None:
+            raise StoreError(f"注册表中没有主题: {title}")
+        end = next((i for i in range(start + 1, len(lines))
+                    if lines[i].startswith("## ")), len(lines))
+        block = [ln for ln in lines[start + 1:end]
+                 if not re.match(r"^-\s*标签:", ln)]
+        if tags:
+            pos = next((k for k, ln in enumerate(block)
+                        if ln.startswith("- 卡:")), -1)
+            block.insert(pos + 1, f"- 标签: {', '.join(tags)}\n")
+        p.write_text("".join(lines[:start + 1] + block + lines[end:]),
+                     encoding="utf-8")
+        self._index_note(TOPICS_FILE, "主题记忆注册表",
+                         p.read_text(encoding="utf-8"))
+        self.snapshots.commit(
+            f"topic: tags {title} → {', '.join(tags) or '（清空）'}")
+
+    def topic_tag(self, title: str, add: str = "", remove: str = "") -> dict:
+        """为主题增删标签（幂等，轻量可逆元数据）。返回该主题标签与
+        全库标签清单——引导 agent 优先复用已有标签，避免同义词蔓延。"""
+        tmap = {t["title"]: t for t in self.load_topics()}
+        if title not in tmap:
+            known = "、".join(tmap) or "（空）"
+            raise StoreError(f"注册表中没有主题: {title}。现有主题: {known}")
+        add_l = self._parse_tags(add)
+        rm_l = self._parse_tags(remove)
+        new = [x for x in (tmap[title].get("tags") or []) if x not in rm_l]
+        for a in add_l:
+            if a not in new:
+                new.append(a)
+        self._set_topic_tags(title, new)
+        all_tags = sorted({x for t in self.load_topics()
+                           for x in t.get("tags") or []})
+        return {"title": title, "tags": new, "all_tags": all_tags}
+
+    def tag_rename(self, old: str, new: str) -> dict:
+        """重命名标签（全库批量改写；重名等价于合并）。"""
+        old, new = old.strip(), new.strip()
+        if not old or not new:
+            raise StoreError("标签名不能为空")
+        affected = [t["title"] for t in self.load_topics()
+                    if old in (t.get("tags") or [])]
+        if not affected:
+            raise StoreError(f"标签不存在: {old}")
+        for title in affected:
+            tags = next(t["tags"] for t in self.load_topics()
+                        if t["title"] == title)
+            nt = []
+            for x in tags:
+                if x == old:
+                    if new not in nt:
+                        nt.append(new)      # 重名 = 合并
+                else:
+                    if x not in nt:
+                        nt.append(x)
+            self._set_topic_tags(title, nt)
+        return {"renamed": f"{old} → {new}", "topics": affected}
+
+    def tag_delete(self, tag: str) -> dict:
+        """删除标签（从所有主题的标签行移除，主题本身不动）。"""
+        tag = tag.strip()
+        if not tag:
+            raise StoreError("标签名不能为空")
+        affected = []
+        for t in self.load_topics():
+            if tag in (t.get("tags") or []):
+                self._set_topic_tags(
+                    t["title"], [x for x in t["tags"] if x != tag])
+                affected.append(t["title"])
+        if not affected:
+            raise StoreError(f"标签不存在: {tag}")
+        return {"deleted": tag, "topics": affected}
 
     def archive_topic(self, title: str) -> dict:
         """Archive a topic (user-instructed): the WHOLE topic directory moves

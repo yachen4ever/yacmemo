@@ -49,10 +49,19 @@ _SYSTEM_PROMPT = """你是个人记忆体系的质量审查员。
 - profile-overlap：PROFILE.md 与主题内容重复或边界不清——画像回答
   "用户是谁、偏好什么"，主题回答"某件事的事实与现状"；明显重叠时
   建议归位（画像保留画像侧，事实留给主题，或反之）。
+- tag-missing：主题没有任何标签——结合该主题卡内容建议 1-2 个标签，
+  优先复用「主题标签」清单里已有的标签词汇（新标签克制）；
+  标签是"视角归类"（如 工作/开发/生活），不要把状态（维护中/已归档）
+  当标签提案。
+- tag-duplicate：语义重复的标签（如 工作/上班/公司）——对照「主题标签」
+  清单判断，建议合并：指明保留哪个标签、清理哪个，涉及的主题会自动改挂。
+- tag-mismatch：标签与主题内容明显不符——该主题卡片讲的内容与所挂标签
+  语义对不上，建议改挂正确标签或移除。
+  （标签在注册表 `- 标签:` 行，改挂/合并由用户裁决后 agent 执行。）
 
 输出严格 JSON（不要 markdown 代码块）：
 {"summary": "总体评价（2-3 句）",
- "findings": [{"type": "duplicate|outdated|stray|stale-card|merge|forget|misplaced|profile-overlap|other",
+ "findings": [{"type": "duplicate|outdated|stray|stale-card|merge|forget|misplaced|profile-overlap|tag-missing|tag-duplicate|tag-mismatch|other",
                "severity": "high|medium|low",
                "paths": ["涉及笔记路径"],
                "reason": "判断依据",
@@ -144,11 +153,23 @@ def build_material(store, max_chars_per_card: int = 2000) -> str:
     mustread = []
     for f in sorted(store.root.glob("agents/*/shared/*.md")):
         mustread.append(f"- {f.relative_to(store.root).as_posix()}：{_headings_of(f)}")
+    # 主题标签清单（tag → 主题 + 未打标主题）——标签治理三稽核的数据源
+    tag_map, untagged = {}, []
+    for t in topics:
+        tags = t.get("tags") or []
+        if tags:
+            for x in tags:
+                tag_map.setdefault(x, []).append(t["title"])
+        else:
+            untagged.append(t["title"])
+    tags_view = [f"- {x}：{'、'.join(ts)}" for x, ts in sorted(tag_map.items())]
+    tags_view.append(f"- （未打标主题：{'、'.join(untagged) or '无'}）")
     material = (
         "### 主题注册表\n" +
         (store.topics_file().read_text(encoding="utf-8")
          if store.topics_file().is_file() else "（空）")
         + "\n\n### 各主题卡\n" + ("\n\n".join(cards) or "（无）")
+        + "\n\n### 主题标签\n" + ("\n".join(tags_view) or "（无）")
         + "\n\n### 模块文件小节标题（各主题目录下的非 abstract 文件）\n"
         + ("\n".join(hygiene) or "（无模块文件）")
         + "\n\n### PROFILE.md（用户画像，强制注入）\n" + profile_text

@@ -1,6 +1,6 @@
 [project]
 name = "yacmemo"
-version = "0.3.7"
+version = "0.3.8"
 description = "Lean personal memory layer: markdown-first, MCP, hybrid retrieval, API-enforced consistency"
 readme = "README.md"
 requires-python = ">=3.11"

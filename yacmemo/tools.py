@@ -459,8 +459,12 @@ def register_tools(mcp: FastMCP, store: Store, searcher: Searcher,
     # ------------------------------------------------------------ topics
 
     @mcp.tool()
-    def topic_list(ctx: Context = None) -> str:
-        """列出当前注册的长期记忆主题（活跃 + 已归档分组，附 abstract 位置）。"""
+    def topic_list(tag: str = "", ctx: Context = None) -> str:
+        """列出当前注册的长期记忆主题（活跃 + 已归档分组，附 abstract 位置与标签）。
+
+        Args:
+            tag: 按标签过滤（可空=全部）
+        """
         out = {"ok": True, "error": ""}
         with _logged("topic_list", ctx, "", out):
             try:
@@ -470,11 +474,19 @@ def register_tools(mcp: FastMCP, store: Store, searcher: Searcher,
                 return f"读取失败: {e}"
             if not topics:
                 return "尚无注册主题。用 topic_register 注册第一个（需用户明确要求）。"
+            tag = tag.strip()
+            if tag:
+                topics = [t for t in topics if tag in (t.get("tags") or [])]
+                if not topics:
+                    return f"没有标签为「{tag}」的主题。"
             active = [t for t in topics if not t.get("archived")]
             archived = [t for t in topics if t.get("archived")]
-            lines = [f"共 {len(active)} 个活跃主题："]
+            lines = [f"共 {len(active)} 个活跃主题"
+                     + (f"（标签「{tag}」过滤）" if tag else "") + "："]
             for t in active:
-                lines.append(f"- {t['title']} — {t['status']}")
+                tags = t.get("tags") or []
+                lines.append(f"- {t['title']} — {t['status']}"
+                             + (f"    标签: {', '.join(tags)}" if tags else ""))
                 lines.append(f"    卡: {t['card']}")
             if archived:
                 lines.append(f"\n已归档（{len(archived)} 个，检索仍可用、context 不再注入）：")
@@ -485,21 +497,49 @@ def register_tools(mcp: FastMCP, store: Store, searcher: Searcher,
             return "\n".join(lines)
 
     @mcp.tool()
+    def topic_tag(title: str, add: str = "", remove: str = "",
+                  ctx: Context = None) -> str:
+        """为主题增删标签（轻量可逆元数据，0-多个）。优先复用已有标签，
+        避免同义词蔓延；响应自带全库标签清单。用户没让就不主动批量打标。
+
+        Args:
+            title: 主题名
+            add: 要添加的标签，逗号分隔（可空）
+            remove: 要移除的标签，逗号分隔（可空）
+        """
+        out = {"ok": True, "error": ""}
+        with _logged("topic_tag", ctx,
+                     summarize_args("topic_tag", locals()), out):
+            try:
+                r = store.topic_tag(title, add, remove)
+            except StoreError as e:
+                return f"{e}"
+            except Exception as e:
+                out["ok"], out["error"] = False, str(e)
+                return f"打标签失败: {e}"
+        tags = ", ".join(r["tags"]) or "（无）"
+        all_tags = ", ".join(r["all_tags"]) or "（尚无）"
+        return (f"已更新「{r['title']}」标签：{tags}\n"
+                f"全库现有标签：{all_tags}\n"
+                f"打标签优先复用已有标签，避免同义词蔓延。")
+
+    @mcp.tool()
     def topic_register(title: str, description: str = "", related: str = "",
-                       ctx: Context = None) -> str:
+                       tags: str = "", ctx: Context = None) -> str:
         """注册一个新的长期记忆主题。仅在用户明确要求时调用（如"把 X 加入长期记忆"）。
 
         Args:
             title: 主题名（如 "notecalc"、"女儿教育"）
             description: 一句话现状描述（写入主题卡）
             related: 相关笔记路径，逗号分隔（可选）
+            tags: 主题标签，逗号分隔（可选；优先复用已有标签）
         """
         out = {"ok": True, "error": ""}
         with _logged("topic_register", ctx,
                      summarize_args("topic_register", locals()), out):
             try:
                 r = store.topic_register(title, description=description,
-                                         related=related)
+                                         related=related, tags=tags)
             except StoreError as e:
                 return f"{e}"
             except Exception as e:

@@ -138,3 +138,15 @@ def test_build_material_surfaces_module_headings_and_profile(store):
     assert "三条铁律" in m and "发版规则" in m
     assert "用户画像" in m
     assert "agents/ 强制注入必读" in m
+
+
+def test_build_material_includes_tag_inventory(store):
+    """主题标签清单进材料——tag 三稽核（missing/duplicate/mismatch）的数据源。"""
+    store.topic_register("甲主题", description="x", tags="工作")
+    store.topic_register("乙主题", description="y")
+    m = build_material(store)
+    assert "### 主题标签" in m
+    assert "工作：甲主题" in m
+    assert "未打标主题：" in m
+    untagged_line = next(ln for ln in m.splitlines() if ln.startswith("- （未打标主题："))
+    assert "乙主题" in untagged_line

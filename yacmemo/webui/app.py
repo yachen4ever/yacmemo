@@ -724,12 +724,28 @@ def create_webui_routes(config: Config, contexts: dict[str, dict]) -> list[Route
             return _err("未知用户", 404)
         topics = await run_in_threadpool(c["store"].load_topics)
         active = [{"title": t["title"], "card": t["card"],
-                   "status": t["status"], "related": t["related"]}
+                   "status": t["status"], "related": t["related"],
+                   "tags": t.get("tags") or []}
                   for t in topics if not t.get("archived")]
         archived = [{"title": t["title"], "card": t["card"],
-                     "status": t["status"]}
+                     "status": t["status"], "tags": t.get("tags") or []}
                     for t in topics if t.get("archived")]
         return _ok({"active": active, "archived": archived})
+
+    async def topics_tag(request: Request):
+        try:
+            c = _ctx(request.path_params["user"])
+        except KeyError:
+            return _err("未知用户", 404)
+        body = await _body(request)
+        try:
+            r = await run_in_threadpool(c["store"].topic_tag,
+                                        body.get("title", ""),
+                                        body.get("add", ""),
+                                        body.get("remove", ""))
+        except Exception as e:
+            return _err(str(e))
+        return _ok(r)
 
     async def topic_archive(request: Request):
         try:
@@ -740,6 +756,31 @@ def create_webui_routes(config: Config, contexts: dict[str, dict]) -> list[Route
         try:
             r = await run_in_threadpool(c["store"].archive_topic,
                                         body.get("title", ""))
+        except Exception as e:
+            return _err(str(e))
+        return _ok(r)
+
+    async def topic_tag_rename(request: Request):
+        try:
+            c = _ctx(request.path_params["user"])
+        except KeyError:
+            return _err("未知用户", 404)
+        body = await _body(request)
+        try:
+            r = await run_in_threadpool(c["store"].tag_rename,
+                                        body.get("old", ""), body.get("new", ""))
+        except Exception as e:
+            return _err(str(e))
+        return _ok(r)
+
+    async def topic_tag_delete(request: Request):
+        try:
+            c = _ctx(request.path_params["user"])
+        except KeyError:
+            return _err("未知用户", 404)
+        body = await _body(request)
+        try:
+            r = await run_in_threadpool(c["store"].tag_delete, body.get("tag", ""))
         except Exception as e:
             return _err(str(e))
         return _ok(r)
@@ -1101,6 +1142,9 @@ def create_webui_routes(config: Config, contexts: dict[str, dict]) -> list[Route
         Route("/api/{user}/proposals", _wrap(proposals_list), methods=["GET"]),
         Route("/api/{user}/topics", _wrap(topics_list), methods=["GET"]),
         Route("/api/{user}/topics/archive", _wrap(topic_archive), methods=["POST"]),
+        Route("/api/{user}/topics/tag", _wrap(topics_tag), methods=["POST"]),
+        Route("/api/{user}/topics/tag-rename", _wrap(topic_tag_rename), methods=["POST"]),
+        Route("/api/{user}/topics/tag-delete", _wrap(topic_tag_delete), methods=["POST"]),
         Route("/api/{user}/profile", _wrap(profile_get), methods=["GET"]),
         Route("/api/{user}/profile", _wrap(profile_save), methods=["PUT"]),
         Route("/api/config", _wrap(config_get), methods=["GET"]),
