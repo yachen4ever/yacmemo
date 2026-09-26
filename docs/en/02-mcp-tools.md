@@ -229,12 +229,15 @@ Fixing an audit issue?       → memory_audit_update to report progress (executi
 topic_list() -> str
 ```
 
-Lists all currently registered long-term memory topics (title, one-sentence status, topic card path). Registry-free zones (journal/, archive/, curator/) are listed separately with a note.
+Lists all currently registered long-term memory topics (title, one-sentence status, topic card path, tags). Registry-free zones (journal/, archive/, curator/) are listed separately with a note.
+
+- The `tag` parameter filters by tag (e.g. topic_list(tag="work"));
+- Tags live in the registry `- 标签:` line (0-N, for perspective grouping, not status).
 
 ## 10. topic_register
 
 ```
-topic_register(title: str, description: str = "", related: str = "") -> str
+topic_register(title: str, description: str = "", related: str = "", tags: str = "") -> str
 ```
 
 Registers a new long-term memory topic: appends to the `TOPICS.md` registry and creates `topics/<topic>/abstract.md` (or uses an existing note as the abstract).
@@ -251,6 +254,18 @@ Write conventions going forward:
 - Detailed notes: memory_write(title="topics/女儿AI陪伴老师/<note-name>", ...) — must include the directory prefix (e.g. "topics/女儿AI陪伴老师/xxx"); a missing prefix is hard-blocked by the topic registry;
 - abstract is the summary card, keep it a one-sentence status: when the status changes, update in place with memory_edit; do not stuff long text into abstract.
 ```
+
+## 10.5 topic_tag
+
+```
+topic_tag(title: str, add: str = "", remove: str = "") -> str
+```
+
+Adds/removes tags on a topic (contract 0.3.8). Tags are lightweight reversible metadata: use when the user asks for a tag, or when executing a tag-related curator proposal.
+
+- `add` / `remove` are comma-separated tag lists (Chinese commas tolerated), usable together;
+- The response carries the **full tag inventory** — prefer reusing existing tags to avoid synonym sprawl;
+- Unprompted batch-tagging is against convention; tags do not affect memory_search content retrieval.
 
 ## 11. topic_unregister
 

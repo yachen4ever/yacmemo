@@ -229,16 +229,20 @@ memory_list(path: str = "", sort: str = "name") -> str
 topic_list() -> str
 ```
 
-列出当前注册的全部长期记忆主题（标题、一句话现状、主题卡路径）。免注册区（journal/、archive/、curator/）单列说明。
+列出当前注册的全部长期记忆主题（标题、一句话现状、主题卡路径、标签）。免注册区（journal/、archive/、curator/）单列说明。
+
+- `tag` 参数可按标签过滤（如 topic_list(tag="工作")）；
+- 标签存于注册表 `- 标签:` 行（0-多个，视角归类用，不是状态）。
 
 ## 10. topic_register
 
 ```
-topic_register(title: str, description: str = "", related: str = "") -> str
+topic_register(title: str, description: str = "", related: str = "", tags: str = "") -> str
 ```
 
 注册新的长期记忆主题：追加到 `TOPICS.md` 注册表，并创建 `topics/<主题>/abstract.md`（或用既有笔记充当 abstract）。
 
+- `tags` 参数：注册时即可打标签（逗号分隔，可选；优先复用已有标签）；
 - **调用门槛**：仅在用户明确要求时调用（"把 X 加入长期记忆"）——这条写进约定块，注册行为本身即用户授权的凭证；
 - **注册是写入的前置条件**：主题硬拦截（见 §3）下，未注册主题覆盖的路径一律拒写——`topic_register` 是新主题的唯一授权门；
 - 重复主题名拒绝（提示直接编辑既有 abstract）；
@@ -251,6 +255,18 @@ topic_register(title: str, description: str = "", related: str = "") -> str
 - 详细笔记：memory_write(title="topics/女儿AI陪伴老师/<笔记名>", ...) ——必须带目录前缀（如 "topics/女儿AI陪伴老师/xxx"），缺前缀会被主题硬拦截；
 - abstract 是摘要卡，保持一句话现状：现状变化用 memory_edit 就地更新，不要把长文塞进 abstract。
 ```
+
+## 10.5 topic_tag
+
+```
+topic_tag(title: str, add: str = "", remove: str = "") -> str
+```
+
+为主题增删标签（契约 0.3.8）。标签是轻量可逆元数据：用户要求打标、或执行标签类 curator 提案时使用。
+
+- `add` / `remove` 均为逗号分隔的标签列表（支持中文逗号），可同时使用；
+- 响应自带**全库标签清单**——打标签优先复用已有标签，避免同义词蔓延；
+- 用户没让就不主动批量打标；标签不影响 memory_search 的内容检索。
 
 ## 11. topic_unregister
 
